@@ -1,51 +1,63 @@
 # Chronograph
 
-Private repository scaffold for Chronograph.
+Chronograph is a local-first work-continuity engine: it ingests fragmented work signals, extracts commitments, builds a source-grounded context graph, persists everything locally, and exposes curated work state through a Python API, CLI, and HTTP JSON API.
 
-Chronograph is a small, local-first MVP of a context graph and task extraction layer. It turns fragmented work signals into structured, source-grounded work state.
+It is designed around the product thesis from `docs/product-notes.md`: useful proactive AI needs continuity, provenance, task curation, and explicit review surfaces — not another reactive prompt box.
 
-## What is implemented
+## What is built
 
-The current implementation covers the product characteristics from `docs/product-notes.md`:
+Chronograph now includes the full local product surface, not a scaffold:
 
-- **Context graph:** source fragments are merged into one active work item by topic.
-- **Task extraction:** real commitments are extracted from meeting/doc/chat/email text while obvious speculative noise is ignored.
-- **Source grounding:** work items retain source IDs, source types, and exact source quotes.
-- **Continuity:** later signals can update owner, deadline, blocked state, blocker, and recent changes.
-- **Proactive surfacing:** risky/review-needed work is exposed through `review_items()`.
-- **Sandbox-local state:** each `Chronograph()` instance owns isolated in-memory state.
+- **Deterministic extractor** for commitments, owners, deadlines, blockers, review/risk signals, projects, artifacts, decisions, and completion updates.
+- **Context graph engine** that merges fragmented signals into durable work items and indexes relationships such as `owns`, `due`, `blocked_by`, `part_of`, `produces`, `needs_review`, and `sourced_from`.
+- **Source-grounded provenance** with source IDs, source types, exact quotes, and chronicle/audit events.
+- **Lifecycle tracking** for `active`, `blocked`, `needs_review`, `done`, and `stale` work.
+- **Curated review queue** for blocked, risky, ambiguous, or explicit review-needed work.
+- **SQLite persistence** for local/private storage.
+- **JSON import/export** for complete workspace backup and restore.
+- **Search** across source text and work item state.
+- **CLI** for ingest/list/active/review/show/search/export/import/serve.
+- **Stdlib HTTP API** for local integrations.
+- **Executable Gherkin acceptance tests** plus unit/integration tests.
 
 ## Repository layout
 
-- `features/chronograph_context.feature` — Gherkin acceptance scenarios
-- `tests/acceptance_runner.py` — dependency-free Gherkin runner for the feature grammar
-- `tests/test_chronograph.py` — unit tests for the domain API
-- `src/chronograph/__init__.py` — MVP implementation
+- `docs/requirements.md` — software requirements specification
 - `docs/product-notes.md` — original product/requirements notes
-- `docs/traceability.md` — mapping from characteristic to Gherkin, acceptance test, unit test, and code
+- `docs/traceability.md` — mapping from characteristics to scenarios/tests/code
+- `features/chronograph_context.feature` — Gherkin acceptance scenarios
+- `src/chronograph/models.py` — source, work item, relationship, and event models
+- `src/chronograph/extractor.py` — deterministic extraction rules
+- `src/chronograph/engine.py` — graph/work-continuity engine
+- `src/chronograph/store.py` — SQLite persistence
+- `src/chronograph/cli.py` — command line interface
+- `src/chronograph/api.py` — stdlib WSGI JSON API
+- `tests/acceptance_runner.py` — dependency-free Gherkin runner
+- `tests/test_chronograph.py` — compatibility/domain tests
+- `tests/test_full_system.py` — extractor, engine, storage, CLI, and API tests
 
 ## Run locally
 
 From the repo root:
 
 ```bash
-python3 tests/acceptance_runner.py
-PYTHONPATH=src python3 -m unittest tests.test_chronograph -v
+PYTHONPATH=src python3 tests/acceptance_runner.py
+PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m compileall src tests
 ```
 
 Expected result:
 
-- all 5 Gherkin acceptance scenarios pass
-- all 6 unit tests pass
+- all 9 Gherkin acceptance scenarios pass
+- all 17 unit/integration tests pass
 - compileall succeeds
 
-## Minimal API
+## Python API
 
 ```python
-from chronograph import Chronograph
+from chronograph import Chronograph, ChronographStore
 
-graph = Chronograph()
+graph = Chronograph(ChronographStore("chronograph.db"))
 graph.ingest("m1", "meeting", "Finance should follow up with the customer")
 graph.ingest("s1", "slack", "Need this by Friday")
 graph.ingest("e1", "email", "Alex owns the finance follow-up now")
@@ -54,8 +66,40 @@ item = graph.active_work_items()[0]
 assert item.title == "Finance follow-up"
 assert item.owner == "Alex"
 assert item.deadline == "Friday"
+assert graph.relationship_exists("Alex", "owns", "Finance follow-up")
 ```
+
+## CLI
+
+```bash
+PYTHONPATH=src python3 -m chronograph.cli --db chronograph.db ingest \
+  --id m1 --type meeting \
+  --text "Sam will send customer follow-up by Friday"
+
+PYTHONPATH=src python3 -m chronograph.cli --db chronograph.db review
+PYTHONPATH=src python3 -m chronograph.cli --db chronograph.db show "Sam"
+PYTHONPATH=src python3 -m chronograph.cli --db chronograph.db export > backup.json
+```
+
+## HTTP API
+
+Start the local API:
+
+```bash
+PYTHONPATH=src python3 -m chronograph.cli --db chronograph.db serve --host 127.0.0.1 --port 8765
+```
+
+Endpoints:
+
+- `GET /health`
+- `POST /sources`
+- `GET /work-items`
+- `GET /active`
+- `GET /review`
+- `GET /search?q=<query>`
+- `GET /graph/<entity>`
+- `GET /export`
 
 ## Status
 
-Local repository is working and verified. Remote GitHub private repo is pending credentials.
+Working local-first implementation. Private GitHub remote: `ucalyptus/chronograph`.

@@ -1,59 +1,82 @@
 # Chronograph traceability
 
-This document maps the original Chronograph characteristics into executable behavior.
+This document maps the Chronograph characteristics into executable behavior.
 
 ## CH-01 Context graph
 
+- **Requirement:** FR-04, FR-06
 - **Characteristic:** Connect people, projects, decisions, tasks, deadlines, owners, meetings, documents, messages, and artifacts.
-- **Gherkin:** `Scenario: Merge fragmented signals into one active work item`
-- **Acceptance check:** `tests/acceptance_runner.py` verifies one active item merges meeting + Slack + email sources.
-- **Unit test:** `test_merges_fragments_by_topic_into_one_active_work_item`
-- **Code:** `Chronograph.ingest`, `WorkItem.add_source`, `_extract_title`, `_merge_item_fields`
+- **Gherkin:** `Scenario: Merge fragmented signals into one active work item`; `Scenario: Persist and reload a local workspace`
+- **Unit/integration tests:** `test_merges_fragments_tracks_graph_and_chronicle`, `test_sqlite_store_round_trips_state`
+- **Code:** `src/chronograph/engine.py`, `src/chronograph/models.py`
 
 ## CH-02 Task extraction and curation
 
+- **Requirement:** FR-02, FR-03
 - **Characteristic:** Separate real commitments from conversational noise, active work, stale work, blockers, review-needed items, and low-value clutter.
 - **Gherkin:** `Scenario: Curate real commitments instead of dumping conversational noise`
-- **Acceptance check:** extracts `Board memo` but ignores speculative logo redesign chatter.
-- **Unit test:** `test_curates_real_commitments_and_ignores_speculative_noise`
-- **Code:** `_extract_work_items`, `_is_noise`, `_extract_title`, `_extract_owner`, `_extract_deadline`
+- **Unit/integration tests:** `test_extracts_owner_deadline_project_and_artifact`, `test_ignores_speculative_noise`
+- **Code:** `src/chronograph/extractor.py`
 
 ## CH-03 Source grounding and provenance
 
-- **Characteristic:** Every extracted item should point back to source material and preserve provenance.
-- **Gherkin:** `Scenario: Keep source grounding for extracted work`
-- **Acceptance check:** verifies source quote and source ID are retained.
-- **Unit test:** `test_keeps_source_quotes_and_provenance`
-- **Code:** `Source`, `WorkItem.source_ids`, `WorkItem.source_quotes`, `WorkItem.provenance`
+- **Requirement:** FR-05
+- **Characteristic:** Every extracted item points back to source material and preserves source IDs, types, quotes, and audit events.
+- **Gherkin:** `Scenario: Keep source grounding for extracted work`; `Scenario: Export and import complete state without losing provenance`
+- **Unit/integration tests:** `test_keeps_source_quotes_and_provenance`, `test_export_import_preserves_provenance`
+- **Code:** `Source`, `WorkItem.source_ids`, `WorkItem.source_quotes`, `WorkItem.provenance`, `Chronograph.events`
 
 ## CH-04 Continuity over time
 
-- **Characteristic:** Track what changed, open loops, owners, blockers, and review state over time.
-- **Gherkin:** `Scenario: Track continuity as signals change over time`
-- **Acceptance check:** later Slack signal marks investor response as blocked on finance numbers.
-- **Unit test:** `test_tracks_blocked_state_and_recent_changes`
-- **Code:** `_extract_blocker`, `_merge_item_fields`, `recent_changes`
+- **Requirement:** FR-04, FR-07
+- **Characteristic:** Track what changed, open loops, owners, blockers, completion, and review state over time.
+- **Gherkin:** `Scenario: Track continuity as signals change over time`; `Scenario: Mark completed work done while retaining source history`
+- **Unit/integration tests:** `test_tracks_blocked_state_and_recent_changes`, `test_completion_keeps_history`
+- **Code:** `Chronograph._resolve_item`, `Chronograph._merge_fields`, `Chronograph.recent_changes`
 
 ## CH-05 Proactive surfacing
 
-- **Characteristic:** Surface what needs attention without forcing the user to reconstruct state or process notification spam.
+- **Requirement:** FR-08
+- **Characteristic:** Surface what needs attention without forcing users to reconstruct state or process notification spam.
 - **Gherkin:** `Scenario: Surface proactive review items without notification spam`
-- **Acceptance check:** exactly one review item is surfaced with a clear reason.
-- **Unit test:** `test_surfaces_review_items_with_reason`
-- **Code:** `_extract_review_reason`, `review_items`
+- **Unit/integration tests:** `test_review_queue_is_curated`, `test_surfaces_review_items_with_reason`
+- **Code:** `Chronograph.review_items`, `Extractor._extract_review_reason`
 
-## CH-06 Sandbox-local state
+## CH-06 Sandbox-local persistence
 
-- **Characteristic:** A Chronograph workspace should maintain local/private state rather than global shared memory.
-- **Gherkin:** Covered by `Given an empty Chronograph workspace` in every scenario.
-- **Acceptance check:** every scenario constructs a fresh `AcceptanceWorld` and `Chronograph`.
-- **Unit test:** `test_sandbox_local_instances_do_not_share_state`
-- **Code:** `Chronograph.__init__`
+- **Requirement:** FR-09, FR-14
+- **Characteristic:** Keep workspace state local/private and reloadable from SQLite.
+- **Gherkin:** `Scenario: Persist and reload a local workspace`
+- **Unit/integration tests:** `test_sqlite_store_round_trips_state`, `test_sandbox_local_instances_do_not_share_state`
+- **Code:** `ChronographStore`, `Chronograph.__init__`
+
+## CH-07 Import/export
+
+- **Requirement:** FR-10
+- **Characteristic:** Export and import complete state without losing provenance.
+- **Gherkin:** `Scenario: Export and import complete state without losing provenance`
+- **Unit/integration tests:** `test_export_import_preserves_provenance`
+- **Code:** `Chronograph.export_json`, `Chronograph.import_json`, `ChronographStore.replace_all`
+
+## CH-08 CLI and API surfaces
+
+- **Requirement:** FR-11, FR-12
+- **Characteristic:** Expose local product functionality through a CLI and HTTP JSON API.
+- **Unit/integration tests:** `test_cli_ingest_list_review_export`, `test_wsgi_api_ingest_active_review_and_export`
+- **Code:** `src/chronograph/cli.py`, `src/chronograph/api.py`
+
+## CH-09 Search
+
+- **Requirement:** FR-13
+- **Characteristic:** Search source text and work item state.
+- **Gherkin:** `Scenario: Search across sources and active work`
+- **Unit/integration tests:** `test_search_finds_sources_and_work_items`
+- **Code:** `Chronograph.search`, CLI `search`, API `/search`
 
 ## Verification commands
 
 ```bash
-python3 tests/acceptance_runner.py
-PYTHONPATH=src python3 -m unittest tests.test_chronograph -v
+PYTHONPATH=src python3 tests/acceptance_runner.py
+PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m compileall src tests
 ```

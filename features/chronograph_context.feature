@@ -1,5 +1,5 @@
-Feature: Chronograph context graph and proactive work state
-  Chronograph turns fragmented work signals into structured, source-grounded active work state.
+Feature: Chronograph full local work-continuity engine
+  Chronograph ingests fragmented work signals, builds a source-grounded context graph, persists state locally, and exposes curated work state.
 
   Scenario: Merge fragmented signals into one active work item
     Given an empty Chronograph workspace
@@ -40,3 +40,30 @@ Feature: Chronograph context graph and proactive work state
     And I ingest a slack source "s4" saying "Customer follow-up is risky and needs review today"
     Then Chronograph should surface 1 review item
     And the review item reason should be "risky and needs review today"
+
+  Scenario: Persist and reload a local workspace
+    Given an empty Chronograph workspace
+    When I ingest a meeting source "m5" saying "Nina will send launch plan by Wednesday for Project Atlas"
+    And I reopen the Chronograph workspace
+    Then Chronograph should have 1 active work item
+    And the work item owner should be "Nina"
+    And the graph should include relationship "Nina owns Launch plan"
+
+  Scenario: Export and import complete state without losing provenance
+    Given an empty Chronograph workspace
+    When I ingest a doc source "d2" saying "Omar will review security checklist by Friday"
+    And I export and import the Chronograph workspace
+    Then Chronograph should have 1 active work item
+    And the work item should include source quote "Omar will review security checklist by Friday"
+
+  Scenario: Mark completed work done while retaining source history
+    Given an empty Chronograph workspace
+    When I ingest a task source "t1" saying "Maya will send renewal quote by Thursday"
+    And I ingest a task source "t2" saying "Renewal quote is done"
+    Then the work item state should be "done"
+    And the work item sources should be "t1,t2"
+
+  Scenario: Search across sources and active work
+    Given an empty Chronograph workspace
+    When I ingest an email source "e2" saying "Ravi will send customer escalation response by Friday"
+    Then searching for "escalation" should return source "e2"

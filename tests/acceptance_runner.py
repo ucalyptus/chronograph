@@ -4,22 +4,25 @@ from __future__ import annotations
 
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from chronograph import Chronograph  # noqa: E402
+from chronograph import Chronograph, ChronographStore  # noqa: E402
 
 
 class AcceptanceWorld:
     def __init__(self) -> None:
-        self.workspace = Chronograph()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tempdir.name) / "acceptance.db"
+        self.workspace = Chronograph(ChronographStore(self.db_path))
 
     @property
     def only_item(self):
-        items = self.workspace.active_work_items()
-        assert items, "Expected at least one active work item"
+        items = self.workspace.work_items()
+        assert items, "Expected at least one work item"
         return items[0]
 
     @property
@@ -47,7 +50,7 @@ def parse_feature(path: Path):
 
 def run_step(world: AcceptanceWorld, step: str) -> None:
     if step == "Given an empty Chronograph workspace":
-        world.workspace = Chronograph()
+        world.workspace = Chronograph(ChronographStore(world.db_path))
         return
 
     match = re.match(r'^(?:When|And) I ingest an? (\w+) source "([^"]+)" saying "([^"]+)"$', step)
@@ -84,7 +87,7 @@ def run_step(world: AcceptanceWorld, step: str) -> None:
         assert world.only_item.source_ids == expected, f"Expected sources {expected}, got {world.only_item.source_ids}"
         return
 
-    match = re.match(r'^Then the work item should include source quote "([^"]+)"$', step)
+    match = re.match(r'^(?:Then|And) the work item should include source quote "([^"]+)"$', step)
     if match:
         assert match.group(1) in world.only_item.source_quotes
         return
@@ -120,6 +123,28 @@ def run_step(world: AcceptanceWorld, step: str) -> None:
     match = re.match(r'^And the review item reason should be "([^"]+)"$', step)
     if match:
         assert world.only_review_item.review_reason == match.group(1)
+        return
+
+    if step == "And I reopen the Chronograph workspace":
+        world.workspace = Chronograph(ChronographStore(world.db_path))
+        return
+
+    if step == "And I export and import the Chronograph workspace":
+        payload = world.workspace.export_json()
+        world.workspace = Chronograph.import_json(payload, store=ChronographStore(world.db_path))
+        return
+
+    match = re.match(r'^And the graph should include relationship "([^"]+) ([a-z_]+) ([^"]+)"$', step)
+    if match:
+        subject, predicate, object_ = match.groups()
+        assert world.workspace.relationship_exists(subject, predicate, object_), world.workspace.relationships()
+        return
+
+    match = re.match(r'^Then searching for "([^"]+)" should return source "([^"]+)"$', step)
+    if match:
+        query, source_id = match.groups()
+        sources = world.workspace.search(query)["sources"]
+        assert any(source["source_id"] == source_id for source in sources), sources
         return
 
     raise AssertionError(f"No step implementation for: {step}")
