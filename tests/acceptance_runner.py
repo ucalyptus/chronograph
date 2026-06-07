@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Tiny Gherkin acceptance runner for Chronograph's MVP feature grammar."""
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from chronograph import Chronograph  # noqa: E402
+
+
+class AcceptanceWorld:
+    def __init__(self) -> None:
+        self.workspace = Chronograph()
+
+    @property
+    def only_item(self):
+        items = self.workspace.active_work_items()
+        assert items, "Expected at least one active work item"
+        return items[0]
+
+    @property
+    def only_review_item(self):
+        items = self.workspace.review_items()
+        assert items, "Expected at least one review item"
+        return items[0]
+
+
+def parse_feature(path: Path):
+    scenarios = []
+    current = None
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("Feature:"):
+            continue
+        if line.startswith("Scenario:"):
+            current = {"name": line, "steps": []}
+            scenarios.append(current)
+            continue
+        if current and re.match(r"^(Given|When|And|Then) ", line):
+            current["steps"].append(line)
+    return scenarios
+
+
+def run_step(world: AcceptanceWorld, step: str) -> None:
+    if step == "Given an empty Chronograph workspace":
+        world.workspace = Chronograph()
+        return
+
+    match = re.match(r'^(?:When|And) I ingest an? (\w+) source "([^"]+)" saying "([^"]+)"$', step)
+    if match:
+        source_type, source_id, text = match.groups()
+        world.workspace.ingest(source_id=source_id, source_type=source_type, text=text)
+        return
+
+    match = re.match(r'^Then Chronograph should have (\d+) active work item$', step)
+    if match:
+        expected = int(match.group(1))
+        actual = len(world.workspace.active_work_items())
+        assert actual == expected, f"Expected {expected} active item(s), got {actual}"
+        return
+
+    match = re.match(r'^And the work item should be titled "([^"]+)"$', step)
+    if match:
+        assert world.only_item.title == match.group(1)
+        return
+
+    match = re.match(r'^And the work item owner should be "([^"]+)"$', step)
+    if match:
+        assert world.only_item.owner == match.group(1)
+        return
+
+    match = re.match(r'^And the work item deadline should be "([^"]+)"$', step)
+    if match:
+        assert world.only_item.deadline == match.group(1)
+        return
+
+    match = re.match(r'^And the work item sources should be "([^"]+)"$', step)
+    if match:
+        expected = match.group(1).split(",")
+        assert world.only_item.source_ids == expected, f"Expected sources {expected}, got {world.only_item.source_ids}"
+        return
+
+    match = re.match(r'^Then the work item should include source quote "([^"]+)"$', step)
+    if match:
+        assert match.group(1) in world.only_item.source_quotes
+        return
+
+    match = re.match(r'^And the work item should explain provenance with source "([^"]+)"$', step)
+    if match:
+        provenance = world.only_item.provenance()
+        assert match.group(1) in provenance, provenance
+        return
+
+    match = re.match(r'^Then the work item state should be "([^"]+)"$', step)
+    if match:
+        assert world.only_item.state == match.group(1)
+        return
+
+    match = re.match(r'^And the work item blocker should be "([^"]+)"$', step)
+    if match:
+        assert world.only_item.blocker == match.group(1)
+        return
+
+    match = re.match(r'^And Chronograph should report change "([^"]+)"$', step)
+    if match:
+        assert match.group(1) in world.workspace.recent_changes(), world.workspace.recent_changes()
+        return
+
+    match = re.match(r'^Then Chronograph should surface (\d+) review item$', step)
+    if match:
+        expected = int(match.group(1))
+        actual = len(world.workspace.review_items())
+        assert actual == expected, f"Expected {expected} review item(s), got {actual}"
+        return
+
+    match = re.match(r'^And the review item reason should be "([^"]+)"$', step)
+    if match:
+        assert world.only_review_item.review_reason == match.group(1)
+        return
+
+    raise AssertionError(f"No step implementation for: {step}")
+
+
+def main() -> int:
+    feature_path = ROOT / "features" / "chronograph_context.feature"
+    failures = []
+    for scenario in parse_feature(feature_path):
+        world = AcceptanceWorld()
+        step = "<no steps>"
+        try:
+            for step in scenario["steps"]:
+                run_step(world, step)
+            print(f"PASS {scenario['name']}")
+        except Exception as exc:  # noqa: BLE001 - human-readable acceptance runner
+            failures.append((scenario["name"], step, exc))
+            print(f"FAIL {scenario['name']}\n  step: {step}\n  error: {exc}")
+    if failures:
+        print(f"\n{len(failures)} scenario(s) failed")
+        return 1
+    print("\nAll acceptance scenarios passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
