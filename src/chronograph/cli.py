@@ -1,4 +1,5 @@
 """Command line interface for Chronograph."""
+
 from __future__ import annotations
 
 import argparse
@@ -75,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         print(graph.export_json())
         return 0
     if args.command == "import":
-        with open(args.path, "r", encoding="utf-8") as fh:
+        with open(args.path, encoding="utf-8") as fh:
             Chronograph.import_json(fh.read(), store=ChronographStore(args.db))
         _print({"imported": True})
         return 0

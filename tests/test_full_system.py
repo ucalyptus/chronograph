@@ -7,13 +7,15 @@ import unittest
 from pathlib import Path
 
 from chronograph import Chronograph, ChronographStore
-from chronograph.extractor import Extractor
 from chronograph.api import create_app
+from chronograph.extractor import Extractor
 
 
 class ExtractorTests(unittest.TestCase):
     def test_extracts_owner_deadline_project_and_artifact(self):
-        extracted = Extractor().extract("s1", "meeting", "Nina will send launch plan by Wednesday for Project Atlas")
+        extracted = Extractor().extract(
+            "s1", "meeting", "Nina will send launch plan by Wednesday for Project Atlas"
+        )
         self.assertEqual(len(extracted), 1)
         item = extracted[0]
         self.assertEqual(item.title, "Launch plan")
@@ -23,16 +25,22 @@ class ExtractorTests(unittest.TestCase):
         self.assertIn("launch plan", item.artifacts)
 
     def test_ignores_speculative_noise(self):
-        extracted = Extractor().extract("s2", "meeting", "Great chat. Maybe someday we should redesign the logo.")
+        extracted = Extractor().extract(
+            "s2", "meeting", "Great chat. Maybe someday we should redesign the logo."
+        )
         self.assertEqual(extracted, [])
 
     def test_extracts_done_blocked_and_review_signals(self):
-        blocked = Extractor().extract("s3", "slack", "Investor response is blocked on finance numbers")[0]
+        blocked = Extractor().extract(
+            "s3", "slack", "Investor response is blocked on finance numbers"
+        )[0]
         self.assertEqual(blocked.state, "blocked")
         self.assertEqual(blocked.blocker, "finance numbers")
         done = Extractor().extract("s4", "task", "Investor response is done")[0]
         self.assertEqual(done.state, "done")
-        risky = Extractor().extract("s5", "slack", "Customer follow-up is risky and needs review today")[0]
+        risky = Extractor().extract(
+            "s5", "slack", "Customer follow-up is risky and needs review today"
+        )[0]
         self.assertEqual(risky.review_reason, "risky and needs review today")
 
 
@@ -84,7 +92,9 @@ class PersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "chronograph.db"
             first = Chronograph(store=ChronographStore(path))
-            first.ingest("m5", "meeting", "Nina will send launch plan by Wednesday for Project Atlas")
+            first.ingest(
+                "m5", "meeting", "Nina will send launch plan by Wednesday for Project Atlas"
+            )
 
             second = Chronograph(store=ChronographStore(path))
             items = second.active_work_items()
@@ -110,19 +120,66 @@ class CliTests(unittest.TestCase):
             env = os.environ | {"PYTHONPATH": "src"}
             base = [sys.executable, "-m", "chronograph.cli", "--db", str(db)]
             ingest = subprocess.run(
-                base + ["ingest", "--id", "m1", "--type", "meeting", "--text", "Sam will send customer follow-up by Friday"],
-                cwd=Path(__file__).resolve().parents[1], env=env, text=True, capture_output=True, check=True,
+                [
+                    *base,
+                    "ingest",
+                    "--id",
+                    "m1",
+                    "--type",
+                    "meeting",
+                    "--text",
+                    "Sam will send customer follow-up by Friday",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
             )
             self.assertIn("Customer follow-up", ingest.stdout)
             subprocess.run(
-                base + ["ingest", "--id", "s1", "--type", "slack", "--text", "Customer follow-up is risky and needs review today"],
-                cwd=Path(__file__).resolve().parents[1], env=env, text=True, capture_output=True, check=True,
+                [
+                    *base,
+                    "ingest",
+                    "--id",
+                    "s1",
+                    "--type",
+                    "slack",
+                    "--text",
+                    "Customer follow-up is risky and needs review today",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
             )
-            listed = subprocess.run(base + ["list"], cwd=Path(__file__).resolve().parents[1], env=env, text=True, capture_output=True, check=True)
+            listed = subprocess.run(
+                [*base, "list"],
+                cwd=Path(__file__).resolve().parents[1],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
             self.assertIn("Customer follow-up", listed.stdout)
-            review = subprocess.run(base + ["review"], cwd=Path(__file__).resolve().parents[1], env=env, text=True, capture_output=True, check=True)
+            review = subprocess.run(
+                [*base, "review"],
+                cwd=Path(__file__).resolve().parents[1],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
             self.assertIn("risky and needs review today", review.stdout)
-            exported = subprocess.run(base + ["export"], cwd=Path(__file__).resolve().parents[1], env=env, text=True, capture_output=True, check=True)
+            exported = subprocess.run(
+                [*base, "export"],
+                cwd=Path(__file__).resolve().parents[1],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
             self.assertIn('"sources"', exported.stdout)
 
 
@@ -140,21 +197,87 @@ class ApiTests(unittest.TestCase):
                 "CONTENT_LENGTH": str(len(payload)),
                 "wsgi.input": __import__("io").BytesIO(payload),
             }
+
             def start_response(status, headers):
                 response["status"] = status
                 response["headers"] = headers
+
             data = b"".join(app(environ, start_response)).decode()
             return response["status"], json.loads(data)
 
-        status, created = call("POST", "/sources", {"source_id": "m1", "source_type": "meeting", "text": "Sam will send customer follow-up by Friday"})
+        status, created = call(
+            "POST",
+            "/sources",
+            {
+                "source_id": "m1",
+                "source_type": "meeting",
+                "text": "Sam will send customer follow-up by Friday",
+            },
+        )
         self.assertTrue(status.startswith("201"))
         self.assertEqual(created["work_items"][0]["title"], "Customer follow-up")
-        call("POST", "/sources", {"source_id": "s1", "source_type": "slack", "text": "Customer follow-up is risky and needs review today"})
+        call(
+            "POST",
+            "/sources",
+            {
+                "source_id": "s1",
+                "source_type": "slack",
+                "text": "Customer follow-up is risky and needs review today",
+            },
+        )
         status, review = call("GET", "/review")
         self.assertTrue(status.startswith("200"))
         self.assertEqual(review[0]["review_reason"], "risky and needs review today")
         status, exported = call("GET", "/export")
         self.assertIn("sources", exported)
+
+
+class IntegrationAuditTests(unittest.TestCase):
+    """Extra integration coverage from the SDLC audit (A-I-01..A-I-04)."""
+
+    def test_export_import_round_trip_through_sqlite_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first_db = Path(tmp) / "first.db"
+            first = Chronograph(store=ChronographStore(first_db))
+            first.ingest("d1", "doc", "Nina will send launch plan by Wednesday for Project Atlas")
+            first.ingest("s1", "slack", "Launch plan is risky and needs review today")
+            payload = first.export_json()
+
+            second_db = Path(tmp) / "second.db"
+            restored = Chronograph.import_json(payload, store=ChronographStore(second_db))
+            second_payload = restored.export_json()
+
+            self.assertEqual(json.loads(payload), json.loads(second_payload))
+            self.assertTrue(second_db.exists())
+            self.assertTrue(restored.relationship_exists("Nina", "owns", "Launch plan"))
+
+    def test_graph_neighborhood_returns_all_edges_for_ingested_entity(self):
+        graph = Chronograph()
+        graph.ingest("m1", "meeting", "Nina will send launch plan by Wednesday for Project Atlas")
+        neighborhood = graph.graph_neighborhood("Nina")
+        self.assertIn("Nina", neighborhood["nodes"])
+        self.assertIn("Launch plan", neighborhood["nodes"])
+        predicates = {edge["predicate"] for edge in neighborhood["edges"]}
+        self.assertIn("owns", predicates)
+
+    def test_contextual_update_applies_when_titleless_signal_follows_one_item(self):
+        graph = Chronograph()
+        graph.ingest("m1", "meeting", "Priya owns the investor response by Thursday")
+        graph.ingest("s1", "slack", "Need this by Friday")
+
+        item = graph.active_work_items()[0]
+        self.assertEqual(item.deadline, "Friday")
+
+    def test_search_finds_matches_after_sqlite_reload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "search.db"
+            first = Chronograph(store=ChronographStore(db))
+            first.ingest("e1", "email", "Ravi will send customer escalation response by Friday")
+
+            reloaded = Chronograph(store=ChronographStore(db))
+            results = reloaded.search("escalation")
+            self.assertEqual(results["sources"][0]["source_id"], "e1")
+            self.assertEqual(results["work_items"][0]["title"], "Customer escalation response")
 
 
 if __name__ == "__main__":

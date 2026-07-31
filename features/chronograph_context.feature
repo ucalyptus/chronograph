@@ -67,3 +67,41 @@ Feature: Chronograph full local work-continuity engine
     Given an empty Chronograph workspace
     When I ingest an email source "e2" saying "Ravi will send customer escalation response by Friday"
     Then searching for "escalation" should return source "e2"
+
+  Scenario: Retain source author and metadata for provenance
+    Given an empty Chronograph workspace
+    When I ingest a slack source "s10" from "Ada" with metadata "channel=eng" saying "Ada will send infra update by Monday"
+    Then Chronograph should have 1 active work item
+    And the source "s10" author should be "Ada"
+    And the source "s10" metadata "channel" should be "eng"
+
+  Scenario: The Chronograph CLI exposes the documented commands
+    Given the Chronograph CLI
+    Then the CLI should expose command "ingest"
+    And the CLI should expose command "list"
+    And the CLI should expose command "active"
+    And the CLI should expose command "review"
+    And the CLI should expose command "show"
+    And the CLI should expose command "search"
+    And the CLI should expose command "export"
+    And the CLI should expose command "import"
+    And the CLI should expose command "serve"
+
+  Scenario: The Chronograph HTTP API responds to the documented endpoints
+    Given an empty Chronograph workspace
+    When I request GET "/health"
+    Then the HTTP response status should be "200 OK"
+    When I request GET "/active"
+    Then the HTTP response status should be "200 OK"
+    When I request GET "/work-items"
+    Then the HTTP response status should be "200 OK"
+    When I request GET "/review"
+    Then the HTTP response status should be "200 OK"
+    When I request GET "/export"
+    Then the HTTP response status should be "200 OK"
+
+  Scenario: Workspace state stays local in the SQLite file
+    Given an empty Chronograph workspace
+    When I ingest a meeting source "m20" saying "Priya owns the compliance review by Friday"
+    Then the workspace file should exist locally
+    And the workspace file should contain source "m20"

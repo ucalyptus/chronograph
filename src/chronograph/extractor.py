@@ -1,4 +1,5 @@
 """Deterministic commitment extraction for Chronograph."""
+
 from __future__ import annotations
 
 import re

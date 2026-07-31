@@ -1,13 +1,14 @@
 """Domain models for Chronograph."""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,7 @@ class Source:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Source":
+    def from_dict(cls, data: dict[str, Any]) -> Source:
         return cls(
             source_id=data["source_id"],
             source_type=data["source_type"],
@@ -46,7 +47,7 @@ class Relationship:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Relationship":
+    def from_dict(cls, data: dict[str, Any]) -> Relationship:
         return cls(**data)
 
 
@@ -62,7 +63,7 @@ class Event:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Event":
+    def from_dict(cls, data: dict[str, Any]) -> Event:
         return cls(**data)
 
 
@@ -93,6 +94,7 @@ class WorkItem:
     @staticmethod
     def slugify(value: str) -> str:
         import re
+
         slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
         return slug or "work-item"
 
@@ -104,11 +106,14 @@ class WorkItem:
             self.updated_at = utc_now()
 
     def provenance(self) -> str:
-        return ", ".join(f"{sid} ({stype})" for sid, stype in zip(self.source_ids, self.source_types))
+        return ", ".join(
+            f"{sid} ({stype})"
+            for sid, stype in zip(self.source_ids, self.source_types, strict=False)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "WorkItem":
+    def from_dict(cls, data: dict[str, Any]) -> WorkItem:
         return cls(**data)

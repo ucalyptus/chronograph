@@ -25,6 +25,7 @@ Chronograph now includes the full local product surface, not a scaffold:
 - `docs/requirements.md` — software requirements specification
 - `docs/product-notes.md` — original product/requirements notes
 - `docs/traceability.md` — mapping from characteristics to scenarios/tests/code
+- `AGENTS.md` — repo conventions for AI/human contributors
 - `features/chronograph_context.feature` — Gherkin acceptance scenarios
 - `src/chronograph/models.py` — source, work item, relationship, and event models
 - `src/chronograph/extractor.py` — deterministic extraction rules
@@ -34,7 +35,16 @@ Chronograph now includes the full local product surface, not a scaffold:
 - `src/chronograph/api.py` — stdlib WSGI JSON API
 - `tests/acceptance_runner.py` — dependency-free Gherkin runner
 - `tests/test_chronograph.py` — compatibility/domain tests
-- `tests/test_full_system.py` — extractor, engine, storage, CLI, and API tests
+- `tests/test_extractor_units.py` — pure-helper unit tests for extractor + models + engine helpers
+- `tests/test_property.py` — stdlib-random property tests (deterministic seeds)
+- `tests/test_full_system.py` — extractor, engine, storage, CLI, and API integration tests
+- `tests/test_e2e.py` — real-socket API tests + `chronograph serve` subprocess flow + CLI subcommand E2E
+- `scripts/crap.py` — CRAP score reporter (needs `coverage/coverage.json`)
+- `scripts/boundary.py` — intra-package dep-direction enforcement
+- `scripts/dry.py` — near-duplicate-block detector
+- `scripts/soft_gherkin.py` — mutates `.feature` literals to catch under-asserting step defs
+- `Makefile` — canonical quality-gate targets
+- `.pre-commit-config.yaml` — local hook runner for the fast gates
 
 ## Run locally
 
@@ -46,11 +56,40 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m compileall src tests
 ```
 
+Or use the `Makefile` for the full quality-gate sweep:
+
+```bash
+make lint        # ruff check
+make format      # ruff format --check
+make test        # unit + integration + property + e2e via unittest discover
+make acceptance  # Gherkin scenarios (custom stdlib runner)
+make compile     # compileall
+make all         # everything above plus boundary, dry, coverage, crap
+```
+
 Expected result:
 
-- all 9 Gherkin acceptance scenarios pass
-- all 17 unit/integration tests pass
+- 13 Gherkin acceptance scenarios pass
+- 96 unit / integration / property / e2e tests pass
 - compileall succeeds
+- boundary and DRY scripts report no violations
+
+## Development dependencies
+
+Runtime is stdlib-only (see `NFR-02` in `docs/requirements.md`). Dev-only tooling (coverage, mutmut, ruff, pre-commit) lives under `[project.optional-dependencies].dev` in `pyproject.toml`:
+
+```bash
+pip install -e ".[dev]"
+make precommit             # install .git/hooks/pre-commit
+make lint                  # ruff check
+make format                # ruff format --check
+make coverage              # coverage.py → coverage/coverage.json
+make crap                  # CRAP-score report (uses coverage/coverage.json)
+make mutation              # mutmut against extractor + models
+make gherkin_mutation      # soft Gherkin mutation scan
+```
+
+See `AGENTS.md` for repo-wide conventions and the mapping to the swarmforge 11-gate taxonomy.
 
 ## Python API
 
