@@ -2,10 +2,12 @@ PY := python3
 PYTHONPATH := src
 export PYTHONPATH
 
-.PHONY: help test acceptance unit integration property e2e compile coverage crap boundary dry mutation gherkin_mutation all clean
+.PHONY: help lint format test acceptance unit integration property e2e compile coverage crap boundary dry mutation gherkin_mutation precommit all clean
 
 help:
 	@echo "Chronograph quality gate targets (see docs/swarmforge-gates.md for the 11-gate taxonomy):"
+	@echo "  lint              — ruff check on src / tests / scripts"
+	@echo "  format            — ruff format --check on src / tests / scripts"
 	@echo "  test              — unit + integration + property + e2e via unittest discover"
 	@echo "  acceptance        — Gherkin scenarios via tests/acceptance_runner.py"
 	@echo "  compile           — python -m compileall src tests"
@@ -15,7 +17,14 @@ help:
 	@echo "  dry               — scripts/dry.py duplicate-block check"
 	@echo "  mutation          — mutmut run against src/chronograph/{extractor,models}.py (requires dev deps)"
 	@echo "  gherkin_mutation  — scripts/soft_gherkin.py mutant scan"
+	@echo "  precommit         — install .git/hooks/pre-commit via pre-commit"
 	@echo "  all               — full local quality-gate sweep"
+
+lint:
+	ruff check src tests scripts
+
+format:
+	ruff format --check src tests scripts
 
 test:
 	$(PY) -m unittest discover -s tests -v
@@ -47,7 +56,10 @@ mutation:
 gherkin_mutation:
 	$(PY) scripts/soft_gherkin.py
 
-all: compile test acceptance boundary dry coverage crap
+precommit:
+	pre-commit install
+
+all: lint format compile test acceptance boundary dry coverage crap
 
 clean:
 	rm -rf coverage .coverage .mutmut-cache __pycache__ */__pycache__ */*/__pycache__

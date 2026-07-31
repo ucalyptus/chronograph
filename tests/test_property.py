@@ -3,8 +3,8 @@
 No third-party dependency added — this stays inside the repo's zero-dep runtime
 posture. Each property function seeds its own RNG so failures are reproducible.
 """
+
 import random
-import re
 import string
 import unittest
 
@@ -31,7 +31,16 @@ class SlugifyPropertyTests(unittest.TestCase):
 class SentencesPropertyTests(unittest.TestCase):
     def test_sentences_always_returns_at_least_one_stripped_element(self):
         rng = random.Random(1)
-        fragments = ["hi", "hello world", "bye", "no signals", "will send", "owns", "review", "great chat"]
+        fragments = [
+            "hi",
+            "hello world",
+            "bye",
+            "no signals",
+            "will send",
+            "owns",
+            "review",
+            "great chat",
+        ]
         for _ in range(200):
             n = rng.randint(1, 5)
             sep_pool = [". ", "! ", "? ", ".  "]
@@ -83,7 +92,11 @@ class SimilarPropertyTests(unittest.TestCase):
         for _ in range(300):
             a = " ".join(rng.sample(pool, k=rng.randint(1, 4)))
             b = " ".join(rng.sample(pool, k=rng.randint(1, 4)))
-            self.assertEqual(Chronograph._similar(a, b), Chronograph._similar(b, a), msg=f"asymmetric on {a!r},{b!r}")
+            self.assertEqual(
+                Chronograph._similar(a, b),
+                Chronograph._similar(b, a),
+                msg=f"asymmetric on {a!r},{b!r}",
+            )
 
 
 class ExtractIdempotencePropertyTests(unittest.TestCase):
@@ -112,9 +125,15 @@ class ExtractIdempotencePropertyTests(unittest.TestCase):
             )
             first = extractor.extract("s1", "meeting", text)
             second = extractor.extract("s1", "meeting", text)
-            first_shape = [(i.title, i.owner, i.deadline, i.state, i.blocker, i.review_reason) for i in first]
-            second_shape = [(i.title, i.owner, i.deadline, i.state, i.blocker, i.review_reason) for i in second]
-            self.assertEqual(first_shape, second_shape, msg=f"extract not idempotent for text={text!r}")
+            first_shape = [
+                (i.title, i.owner, i.deadline, i.state, i.blocker, i.review_reason) for i in first
+            ]
+            second_shape = [
+                (i.title, i.owner, i.deadline, i.state, i.blocker, i.review_reason) for i in second
+            ]
+            self.assertEqual(
+                first_shape, second_shape, msg=f"extract not idempotent for text={text!r}"
+            )
 
 
 class MergeFieldsPropertyTests(unittest.TestCase):

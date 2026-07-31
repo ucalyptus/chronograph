@@ -5,6 +5,7 @@ Every pure helper in `Extractor` and every branching helper in
 here, independent of the higher-level integration paths in
 `tests/test_full_system.py`.
 """
+
 import unittest
 
 from chronograph import Chronograph
@@ -41,17 +42,24 @@ class IsNoiseTests(unittest.TestCase):
 
 class ExtractTitleTests(unittest.TestCase):
     def test_follow_up_branch(self):
-        self.assertEqual(Extractor._extract_title("finance should follow up on customer"), "Finance follow-up")
+        self.assertEqual(
+            Extractor._extract_title("finance should follow up on customer"), "Finance follow-up"
+        )
 
     def test_known_topic_short_circuits(self):
         for topic in KNOWN_TOPICS:
-            self.assertEqual(Extractor._extract_title(f"we should send the {topic} tomorrow"), KNOWN_TOPICS[topic])
+            self.assertEqual(
+                Extractor._extract_title(f"we should send the {topic} tomorrow"),
+                KNOWN_TOPICS[topic],
+            )
 
     def test_send_pattern_falls_through_for_unknown_topic(self):
         self.assertEqual(Extractor._extract_title("nina will send widget by monday"), "Widget")
 
     def test_review_pattern(self):
-        self.assertEqual(Extractor._extract_title("liam will review the widget by monday"), "Widget")
+        self.assertEqual(
+            Extractor._extract_title("liam will review the widget by monday"), "Widget"
+        )
 
     def test_owns_pattern(self):
         self.assertEqual(Extractor._extract_title("alex owns the widget now"), "Widget")
@@ -125,7 +133,9 @@ class ExtractArtifactsTests(unittest.TestCase):
 
 class ExtractBlockerTests(unittest.TestCase):
     def test_trims_tail_after_blocked_on(self):
-        self.assertEqual(Extractor._extract_blocker("this is blocked on finance numbers"), "finance numbers")
+        self.assertEqual(
+            Extractor._extract_blocker("this is blocked on finance numbers"), "finance numbers"
+        )
 
     def test_supports_underscore_and_hyphen(self):
         self.assertEqual(Extractor._extract_blocker("blocked on final_sign-off"), "final_sign-off")
@@ -145,7 +155,9 @@ class ExtractReviewReasonTests(unittest.TestCase):
         self.assertEqual(Extractor._extract_review_reason("this is risky"), "risky")
         self.assertEqual(Extractor._extract_review_reason("needs review"), "needs review")
         self.assertEqual(Extractor._extract_review_reason("ambiguous case"), "ambiguous")
-        self.assertEqual(Extractor._extract_review_reason("low confidence signal"), "low confidence")
+        self.assertEqual(
+            Extractor._extract_review_reason("low confidence signal"), "low confidence"
+        )
 
     def test_none_when_no_review_language(self):
         self.assertIsNone(Extractor._extract_review_reason("clear commitment"))
@@ -298,7 +310,9 @@ class MergeFieldsTests(unittest.TestCase):
     def test_lists_merge_without_duplicates(self):
         graph = self._graph()
         item = WorkItem(title="X", projects=["Project Atlas"], artifacts=["memo"])
-        extracted = WorkItem(title="X", projects=["Project Atlas", "Project Nova"], artifacts=["memo", "plan"])
+        extracted = WorkItem(
+            title="X", projects=["Project Atlas", "Project Nova"], artifacts=["memo", "plan"]
+        )
         graph._merge_fields(item, extracted)
         self.assertEqual(item.projects, ["Project Atlas", "Project Nova"])
         self.assertEqual(item.artifacts, ["memo", "plan"])

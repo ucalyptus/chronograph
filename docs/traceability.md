@@ -96,6 +96,8 @@ Chronograph's SDLC layer additionally maps to the swarmforge quality-gate taxono
 
 ```bash
 make all               # everything below in one go
+make lint              # ruff check
+make format            # ruff format --check
 make test              # unit + integration + property + e2e
 make acceptance        # Gherkin scenarios
 make compile           # compileall
@@ -105,4 +107,5 @@ make boundary          # dep-direction check
 make dry               # duplicate-block check
 make mutation          # mutmut (requires dev deps)
 make gherkin_mutation  # soft Gherkin mutation
+make precommit         # install .git/hooks/pre-commit
 ```

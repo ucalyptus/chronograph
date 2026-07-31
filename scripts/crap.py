@@ -10,6 +10,7 @@ Reads coverage/coverage.json produced by:
 
 Exits non-zero when any function's CRAP exceeds THRESHOLD.
 """
+
 from __future__ import annotations
 
 import ast
@@ -28,7 +29,15 @@ def cyclomatic(node: ast.AST) -> int:
     for child in ast.walk(node):
         if isinstance(
             child,
-            (ast.If, ast.For, ast.AsyncFor, ast.While, ast.ExceptHandler, ast.With, ast.AsyncWith, ast.Try, ast.Match),
+            ast.If
+            | ast.For
+            | ast.AsyncFor
+            | ast.While
+            | ast.ExceptHandler
+            | ast.With
+            | ast.AsyncWith
+            | ast.Try
+            | ast.Match,
         ):
             score += 1
         elif isinstance(child, ast.BoolOp):
@@ -65,14 +74,17 @@ def crap(cx: int, cov: float) -> float:
 def main() -> int:
     coverage = load_coverage(COVERAGE_JSON)
     if not coverage:
-        print(f"warning: no coverage found at {COVERAGE_JSON}; treating everything as uncovered", file=sys.stderr)
+        print(
+            f"warning: no coverage found at {COVERAGE_JSON}; treating everything as uncovered",
+            file=sys.stderr,
+        )
 
     rows = []
     for src in sorted(SOURCE_ROOT.glob("*.py")):
         tree = ast.parse(src.read_text(), filename=str(src))
         executed = coverage.get(str(src.resolve()), set())
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 cx = cyclomatic(node)
                 start = node.lineno
                 end = getattr(node, "end_lineno", node.lineno)

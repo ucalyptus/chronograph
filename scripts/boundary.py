@@ -4,6 +4,7 @@
 Enforces the declared layered dependency graph on `src/chronograph/`.
 Fails if any module imports something outside its allow-list.
 """
+
 from __future__ import annotations
 
 import ast
@@ -38,7 +39,9 @@ def main() -> int:
         module = src.stem
         allowed = ALLOWED.get(module)
         if allowed is None:
-            violations.append(f"{src}: unknown module '{module}' — add to ALLOWED map in scripts/boundary.py")
+            violations.append(
+                f"{src}: unknown module '{module}' — add to ALLOWED map in scripts/boundary.py"
+            )
             continue
         for dep in intra_package_imports(src):
             if dep == module:

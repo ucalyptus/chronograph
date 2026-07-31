@@ -59,6 +59,8 @@ python3 -m compileall src tests
 Or use the `Makefile` for the full quality-gate sweep:
 
 ```bash
+make lint        # ruff check
+make format      # ruff format --check
 make test        # unit + integration + property + e2e via unittest discover
 make acceptance  # Gherkin scenarios (custom stdlib runner)
 make compile     # compileall
@@ -74,14 +76,17 @@ Expected result:
 
 ## Development dependencies
 
-Runtime is stdlib-only (see `NFR-02` in `docs/requirements.md`). Dev-only tooling (coverage, mutmut) lives under `[project.optional-dependencies].dev` in `pyproject.toml`:
+Runtime is stdlib-only (see `NFR-02` in `docs/requirements.md`). Dev-only tooling (coverage, mutmut, ruff, pre-commit) lives under `[project.optional-dependencies].dev` in `pyproject.toml`:
 
 ```bash
 pip install -e ".[dev]"
-make coverage        # coverage.py → coverage/coverage.json
-make crap            # CRAP-score report (uses coverage/coverage.json)
-make mutation        # mutmut against extractor + models
-make gherkin_mutation  # soft Gherkin mutation scan
+make precommit             # install .git/hooks/pre-commit
+make lint                  # ruff check
+make format                # ruff format --check
+make coverage              # coverage.py → coverage/coverage.json
+make crap                  # CRAP-score report (uses coverage/coverage.json)
+make mutation              # mutmut against extractor + models
+make gherkin_mutation      # soft Gherkin mutation scan
 ```
 
 See `AGENTS.md` for repo-wide conventions and the mapping to the swarmforge 11-gate taxonomy.

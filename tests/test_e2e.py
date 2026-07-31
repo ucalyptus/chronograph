@@ -4,8 +4,10 @@ Covers Worker B's B-E-01..08 findings — the previous ApiTests use an in-proces
 call, which swarmforge classifies as integration, not E2E. Here we bind a real socket
 via wsgiref.simple_server on an ephemeral port and drive it with urllib.request.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import socket
@@ -73,7 +75,11 @@ class RealSocketApiE2ETests(unittest.TestCase):
     def test_full_ingest_query_export_round_trip(self):
         status, created = self._post(
             "/sources",
-            {"source_id": "e1", "source_type": "meeting", "text": "Nina will send launch plan by Wednesday for Project Atlas"},
+            {
+                "source_id": "e1",
+                "source_type": "meeting",
+                "text": "Nina will send launch plan by Wednesday for Project Atlas",
+            },
         )
         self.assertEqual(status, 201)
         self.assertEqual(created["work_items"][0]["title"], "Launch plan")
@@ -162,7 +168,9 @@ class CliServeSubprocessE2ETests(unittest.TestCase):
         deadline = time.time() + 10
         while time.time() < deadline:
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/health", timeout=0.3) as response:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{self.port}/health", timeout=0.3
+                ) as response:
                     if response.status == 200:
                         return
             except (urllib.error.URLError, ConnectionError):
@@ -179,10 +187,8 @@ class CliServeSubprocessE2ETests(unittest.TestCase):
         finally:
             for stream in (self.proc.stdout, self.proc.stderr):
                 if stream is not None:
-                    try:
+                    with contextlib.suppress(Exception):
                         stream.close()
-                    except Exception:
-                        pass
         self.tmp.cleanup()
 
     def test_live_process_serves_health_and_survives_ingest(self):
@@ -192,7 +198,13 @@ class CliServeSubprocessE2ETests(unittest.TestCase):
 
         request = urllib.request.Request(
             f"http://127.0.0.1:{self.port}/sources",
-            data=json.dumps({"source_id": "e1", "source_type": "meeting", "text": "Nina will send launch plan by Friday"}).encode(),
+            data=json.dumps(
+                {
+                    "source_id": "e1",
+                    "source_type": "meeting",
+                    "text": "Nina will send launch plan by Friday",
+                }
+            ).encode(),
             method="POST",
             headers={"Content-Type": "application/json"},
         )
@@ -225,8 +237,8 @@ class CliSubcommandE2ETests(unittest.TestCase):
             cwd = REPO_ROOT
 
             self._run(
-                base
-                + [
+                [
+                    *base,
                     "ingest",
                     "--id",
                     "m1",
@@ -238,8 +250,8 @@ class CliSubcommandE2ETests(unittest.TestCase):
                 cwd,
             )
             self._run(
-                base
-                + [
+                [
+                    *base,
                     "ingest",
                     "--id",
                     "s1",
@@ -251,26 +263,26 @@ class CliSubcommandE2ETests(unittest.TestCase):
                 cwd,
             )
 
-            active = self._run(base + ["active"], cwd).stdout
+            active = self._run([*base, "active"], cwd).stdout
             self.assertIn("Launch plan", active)
 
-            show = self._run(base + ["show", "Nina"], cwd).stdout
+            show = self._run([*base, "show", "Nina"], cwd).stdout
             self.assertIn("Nina", show)
             self.assertIn("owns", show)
 
-            search = self._run(base + ["search", "launch"], cwd).stdout
+            search = self._run([*base, "search", "launch"], cwd).stdout
             self.assertIn("Launch plan", search)
 
-            exported = self._run(base + ["export"], cwd).stdout
+            exported = self._run([*base, "export"], cwd).stdout
             payload_path = Path(tmp) / "payload.json"
             payload_path.write_text(exported)
 
             db2 = Path(tmp) / "cli2.db"
             base2 = ["--db", str(db2)]
-            imported = self._run(base2 + ["import", str(payload_path)], cwd).stdout
+            imported = self._run([*base2, "import", str(payload_path)], cwd).stdout
             self.assertIn('"imported": true', imported)
 
-            active2 = self._run(base2 + ["active"], cwd).stdout
+            active2 = self._run([*base2, "active"], cwd).stdout
             self.assertIn("Launch plan", active2)
 
 

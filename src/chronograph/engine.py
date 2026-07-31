@@ -1,4 +1,5 @@
 """Chronograph engine."""
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,9 @@ VALID_STATES = {"active", "blocked", "needs_review", "done", "stale"}
 class Chronograph:
     """Local-first context graph and work-continuity engine."""
 
-    def __init__(self, store: ChronographStore | None = None, extractor: Extractor | None = None) -> None:
+    def __init__(
+        self, store: ChronographStore | None = None, extractor: Extractor | None = None
+    ) -> None:
         self.store = store or ChronographStore(":memory:")
         self.extractor = extractor or Extractor()
         self._sources = self.store.load_sources()
@@ -58,17 +61,30 @@ class Chronograph:
             if before_state != item.state:
                 self._record("state_changed", item.state, source.source_id, item.item_id)
             touched.append(item)
-        self._record("source_ingested", f"ingested {source.source_id}", source.source_id, touched[0].item_id if touched else None)
+        self._record(
+            "source_ingested",
+            f"ingested {source.source_id}",
+            source.source_id,
+            touched[0].item_id if touched else None,
+        )
         return touched
 
     def active_work_items(self) -> list[WorkItem]:
-        return [item for item in self._items.values() if item.state in {"active", "blocked", "needs_review"}]
+        return [
+            item
+            for item in self._items.values()
+            if item.state in {"active", "blocked", "needs_review"}
+        ]
 
     def work_items(self) -> list[WorkItem]:
         return list(self._items.values())
 
     def review_items(self) -> list[WorkItem]:
-        return [item for item in self._items.values() if item.review_reason or item.state in {"blocked", "needs_review"}]
+        return [
+            item
+            for item in self._items.values()
+            if item.review_reason or item.state in {"blocked", "needs_review"}
+        ]
 
     def events(self) -> list[Event]:
         return list(self._events)
@@ -80,17 +96,32 @@ class Chronograph:
         return list(self._relationships)
 
     def relationship_exists(self, subject: str, predicate: str, object_: str) -> bool:
-        return any(r.subject == subject and r.predicate == predicate and r.object == object_ for r in self._relationships)
+        return any(
+            r.subject == subject and r.predicate == predicate and r.object == object_
+            for r in self._relationships
+        )
 
     def graph_neighborhood(self, entity: str) -> dict[str, Any]:
-        edges = [r.to_dict() for r in self._relationships if r.subject == entity or r.object == entity]
-        nodes = sorted({entity} | {edge["subject"] for edge in edges} | {edge["object"] for edge in edges})
+        edges = [
+            r.to_dict() for r in self._relationships if r.subject == entity or r.object == entity
+        ]
+        nodes = sorted(
+            {entity} | {edge["subject"] for edge in edges} | {edge["object"] for edge in edges}
+        )
         return {"nodes": nodes, "edges": edges}
 
     def search(self, query: str) -> dict[str, list[dict[str, Any]]]:
         needle = query.lower()
-        sources = [s.to_dict() for s in self._sources.values() if needle in s.text.lower() or needle in s.source_id.lower()]
-        items = [i.to_dict() for i in self._items.values() if needle in i.title.lower() or any(needle in q.lower() for q in i.source_quotes)]
+        sources = [
+            s.to_dict()
+            for s in self._sources.values()
+            if needle in s.text.lower() or needle in s.source_id.lower()
+        ]
+        items = [
+            i.to_dict()
+            for i in self._items.values()
+            if needle in i.title.lower() or any(needle in q.lower() for q in i.source_quotes)
+        ]
         return {"sources": sources, "work_items": items}
 
     def export_data(self) -> dict[str, Any]:
@@ -105,7 +136,7 @@ class Chronograph:
         return json.dumps(self.export_data(), indent=2, sort_keys=True)
 
     @classmethod
-    def import_json(cls, payload: str, store: ChronographStore | None = None) -> "Chronograph":
+    def import_json(cls, payload: str, store: ChronographStore | None = None) -> Chronograph:
         data = json.loads(payload)
         target_store = store or ChronographStore(":memory:")
         target_store.replace_all(data)
@@ -126,7 +157,10 @@ class Chronograph:
         for item_id, item in self._items.items():
             if item.title.lower() == extracted.title.lower():
                 return item_id
-            if extracted.title.lower() in item.title.lower() or item.title.lower() in extracted.title.lower():
+            if (
+                extracted.title.lower() in item.title.lower()
+                or item.title.lower() in extracted.title.lower()
+            ):
                 return item_id
             if set(item.artifacts) & set(extracted.artifacts):
                 return item_id
@@ -136,14 +170,18 @@ class Chronograph:
     def _similar(left: str, right: str) -> bool:
         lwords = set(left.lower().split())
         rwords = set(right.lower().split())
-        return bool(lwords & rwords) and (len(lwords & rwords) / max(len(lwords | rwords), 1)) >= 0.5
+        return (
+            bool(lwords & rwords) and (len(lwords & rwords) / max(len(lwords | rwords), 1)) >= 0.5
+        )
 
     def _contextual_update(self, source: Source) -> WorkItem | None:
         extracted = self.extractor.extract(source.source_id, source.source_type, source.text)
         if extracted:
             return extracted[0]
         lowered = source.text.lower()
-        item = WorkItem(next(iter(self._items.values())).title if self._items else "Contextual update")
+        item = WorkItem(
+            next(iter(self._items.values())).title if self._items else "Contextual update"
+        )
         for day in DAY_WORDS:
             if day.lower() in lowered:
                 item.deadline = day
@@ -152,7 +190,11 @@ class Chronograph:
             item.blocker = lowered.split("blocked on", 1)[1].strip()
         if "needs review" in lowered or "risky" in lowered:
             item.state = "needs_review"
-            item.review_reason = "risky and needs review today" if "risky and needs review today" in lowered else "needs review"
+            item.review_reason = (
+                "risky and needs review today"
+                if "risky and needs review today" in lowered
+                else "needs review"
+            )
         return item if item.deadline or item.blocker or item.review_reason else None
 
     def _merge_fields(self, item: WorkItem, extracted: WorkItem) -> None:
@@ -186,13 +228,27 @@ class Chronograph:
         if item.review_reason:
             self._add_relationship(item.title, "needs_review", item.review_reason, source.source_id)
 
-    def _add_relationship(self, subject: str, predicate: str, object_: str, source_id: str | None) -> None:
+    def _add_relationship(
+        self, subject: str, predicate: str, object_: str, source_id: str | None
+    ) -> None:
         rel = Relationship(subject, predicate, object_, source_id)
-        if not any(r.subject == rel.subject and r.predicate == rel.predicate and r.object == rel.object and r.source_id == rel.source_id for r in self._relationships):
+        if not any(
+            r.subject == rel.subject
+            and r.predicate == rel.predicate
+            and r.object == rel.object
+            and r.source_id == rel.source_id
+            for r in self._relationships
+        ):
             self._relationships.append(rel)
             self.store.save_relationship(rel)
 
-    def _record(self, event_type: str, message: str, source_id: str | None = None, work_item_id: str | None = None) -> None:
+    def _record(
+        self,
+        event_type: str,
+        message: str,
+        source_id: str | None = None,
+        work_item_id: str | None = None,
+    ) -> None:
         event = Event(event_type, message, source_id, work_item_id)
         self._events.append(event)
         self.store.save_event(event)

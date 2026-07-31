@@ -8,13 +8,13 @@ docstrings, imports) are ignored.
 Threshold: fails if any duplicated block spans MIN_BLOCK_LINES or more
 non-trivial lines and appears in two or more distinct locations.
 """
+
 from __future__ import annotations
 
 import hashlib
 import sys
 import tokenize
 from collections import defaultdict
-from io import BytesIO
 from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "src" / "chronograph"
@@ -64,7 +64,9 @@ def main() -> int:
             first_lineno = rows[i][0]
             windows[hash_window(window)].append((path.name, first_lineno))
 
-    duplicates = [(digest, locations) for digest, locations in windows.items() if len(locations) > 1]
+    duplicates = [
+        (digest, locations) for digest, locations in windows.items() if len(locations) > 1
+    ]
     if not duplicates:
         print("OK: no near-duplicate blocks found")
         return 0

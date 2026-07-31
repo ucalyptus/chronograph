@@ -14,9 +14,11 @@ Robust against interruption:
 - If a `.orig` file already exists at startup, its contents are treated as
   the true original (recovery from a prior interrupted run).
 """
+
 from __future__ import annotations
 
 import atexit
+import contextlib
 import os
 import re
 import signal
@@ -40,10 +42,8 @@ def _atomic_write(path: Path, text: str) -> None:
             handle.write(text)
         os.replace(tmp, path)
     except BaseException:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp)
-        except FileNotFoundError:
-            pass
         raise
 
 
@@ -67,21 +67,18 @@ def _restore_all() -> None:
         except FileNotFoundError:
             continue
         marker = path.with_suffix(path.suffix + ".orig")
-        try:
+        with contextlib.suppress(FileNotFoundError):
             marker.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def _install_signal_restorers() -> None:
     def _handler(signum, _frame):
         _restore_all()
         raise SystemExit(128 + signum)
+
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-        try:
+        with contextlib.suppress(ValueError, OSError):
             signal.signal(sig, _handler)
-        except (ValueError, OSError):
-            pass
 
 
 def mutate_line(line: str) -> str | None:
