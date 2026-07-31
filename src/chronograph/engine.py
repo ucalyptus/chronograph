@@ -4,8 +4,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .extractor import Extractor
-from .models import Event, Relationship, Source, WorkItem
+from .extractor import DAY_WORDS, Extractor
+from .models import Event, Relationship, Source, WorkItem, utc_now
 from .store import ChronographStore
 
 VALID_STATES = {"active", "blocked", "needs_review", "done", "stale"}
@@ -31,7 +31,14 @@ class Chronograph:
         author: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> list[WorkItem]:
-        source = Source(source_id, source_type, text, timestamp=timestamp or Source(source_id, source_type, text).timestamp, author=author, metadata=metadata or {})
+        source = Source(
+            source_id,
+            source_type,
+            text,
+            timestamp=timestamp or utc_now(),
+            author=author,
+            metadata=metadata or {},
+        )
         self._sources[source_id] = source
         self.store.save_source(source)
         extracted_items = self.extractor.extract(source_id, source_type, text)
@@ -137,7 +144,7 @@ class Chronograph:
             return extracted[0]
         lowered = source.text.lower()
         item = WorkItem(next(iter(self._items.values())).title if self._items else "Contextual update")
-        for day in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"):
+        for day in DAY_WORDS:
             if day.lower() in lowered:
                 item.deadline = day
         if "blocked on" in lowered:

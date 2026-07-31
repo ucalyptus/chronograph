@@ -9,8 +9,34 @@ description = "Local-first context graph and work-continuity engine"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+dev = [
+    "coverage>=7.0",
+    "mutmut>=3.3",
+]
+
 [project.scripts]
 chronograph = "chronograph.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.coverage.run]
+source = ["src/chronograph"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 85
+
+[tool.coverage.json]
+output = "coverage/coverage.json"
+
+[tool.mutmut]
+paths_to_mutate = ["src/chronograph/extractor.py", "src/chronograph/models.py"]
+runner = "python3 -m unittest discover -s tests"
+do_not_mutate = [
+    "src/chronograph/api.py",
+    "src/chronograph/cli.py",
+]

@@ -157,5 +157,53 @@ class ApiTests(unittest.TestCase):
         self.assertIn("sources", exported)
 
 
+class IntegrationAuditTests(unittest.TestCase):
+    """Extra integration coverage from the SDLC audit (A-I-01..A-I-04)."""
+
+    def test_export_import_round_trip_through_sqlite_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first_db = Path(tmp) / "first.db"
+            first = Chronograph(store=ChronographStore(first_db))
+            first.ingest("d1", "doc", "Nina will send launch plan by Wednesday for Project Atlas")
+            first.ingest("s1", "slack", "Launch plan is risky and needs review today")
+            payload = first.export_json()
+
+            second_db = Path(tmp) / "second.db"
+            restored = Chronograph.import_json(payload, store=ChronographStore(second_db))
+            second_payload = restored.export_json()
+
+            self.assertEqual(json.loads(payload), json.loads(second_payload))
+            self.assertTrue(second_db.exists())
+            self.assertTrue(restored.relationship_exists("Nina", "owns", "Launch plan"))
+
+    def test_graph_neighborhood_returns_all_edges_for_ingested_entity(self):
+        graph = Chronograph()
+        graph.ingest("m1", "meeting", "Nina will send launch plan by Wednesday for Project Atlas")
+        neighborhood = graph.graph_neighborhood("Nina")
+        self.assertIn("Nina", neighborhood["nodes"])
+        self.assertIn("Launch plan", neighborhood["nodes"])
+        predicates = {edge["predicate"] for edge in neighborhood["edges"]}
+        self.assertIn("owns", predicates)
+
+    def test_contextual_update_applies_when_titleless_signal_follows_one_item(self):
+        graph = Chronograph()
+        graph.ingest("m1", "meeting", "Priya owns the investor response by Thursday")
+        graph.ingest("s1", "slack", "Need this by Friday")
+
+        item = graph.active_work_items()[0]
+        self.assertEqual(item.deadline, "Friday")
+
+    def test_search_finds_matches_after_sqlite_reload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "search.db"
+            first = Chronograph(store=ChronographStore(db))
+            first.ingest("e1", "email", "Ravi will send customer escalation response by Friday")
+
+            reloaded = Chronograph(store=ChronographStore(db))
+            results = reloaded.search("escalation")
+            self.assertEqual(results["sources"][0]["source_id"], "e1")
+            self.assertEqual(results["work_items"][0]["title"], "Customer escalation response")
+
+
 if __name__ == "__main__":
     unittest.main()

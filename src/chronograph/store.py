@@ -12,7 +12,12 @@ from .models import Event, Relationship, Source, WorkItem
 class ChronographStore:
     def __init__(self, path: str | Path = ":memory:") -> None:
         self.path = str(path)
-        self.connection = sqlite3.connect(self.path)
+        # check_same_thread=False lets the same connection be used across threads
+        # (needed when `chronograph serve` runs the WSGI server in a background
+        # thread — e.g. under wsgiref.simple_server driven by tests, or under a
+        # threading harness). Chronograph is single-writer by design, so the
+        # sqlite3 driver's per-thread guard is unnecessary friction here.
+        self.connection = sqlite3.connect(self.path, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         self._init_schema()
 
